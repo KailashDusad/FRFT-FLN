@@ -59,7 +59,7 @@ The repository includes result images demonstrating the performance of the algor
 ### Running the Code
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/FRFT-FLN.git
+   git clone https://github.com/KailashDusad/FRFT-FLN.git
    cd FRFT-FLN
    
 2. Open MATLAB & Run FRFT_FLN.m for individual FRFT-FLN evaluation:
