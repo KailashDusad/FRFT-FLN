@@ -97,5 +97,5 @@ The repository includes result images demonstrating the performance of the algor
 ## Author
 
 - **[Kailash Dusad]**  
-- **[kailash.dusad@iitgn.ac.in]**  
+- **[K Madhu]**  
 
