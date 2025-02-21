@@ -1,11 +1,9 @@
-% Comparision of Non-linear System Identification using
+%% Comparision of Non-linear System Identification using
 % AEFLN, TFLN and FRFT-FLN Filters
-
-clear all;
-clc;
+clc; clear; close all;
 rand('seed',0);
 
-for itr = 1:2
+for itr = 1:10
     disp(['Independent Trial No: ', num2str(itr)])
     
     no_of_inputs = 18e6;
@@ -30,46 +28,61 @@ for itr = 1:2
     mu_weight = 0.01;
     mu_aefln = 0.01;
     mu_fln = 0.01;
-    mu_alpha = 0.01;
+    
+    
+    mu_theta = 0.01;
+    mu_a = 0.1; 
+    
     noise = awgn(input, 30) - input;
 
-    alpha(1) = 0.1;
-    a(1) = 0.5;
-    a_integral = 0;
+    a(1) = 0;
+    alpha = 0.5*ones(1,length(input)); 
+    amp = 6*ones(1,length(input));
     
     %-------------vector initialization-------------------------%
     g = zeros(1, no_of_inputs);
     g1 = zeros(1, no_of_inputs);
     g2 = zeros(1, no_of_inputs);
     g3 = zeros(1, no_of_inputs);
-
-    for i = 3:no_of_inputs
-        g1(i) = exp(0.5 * input(i)) * (sin(pi * input(i)) + 0.3 * sin(3 * pi * input(i - 2)) + 0.1 * sin(5 * pi * input(i)));
-    end
-    g1 = awgn(g1, 50); 
+%     g4 = zeros(1,no_of_inputs);
 
     for i = 1:no_of_inputs
         q(i) = (3/2) * input(i) - (3/10) * input(i)^2;
         rho = (q(i) > 0) * 4 + (q(i) <= 0) * 0.5;
-        g2(i) = 2 * ((1 / (1 + exp(-rho * q(i)))) - 0.5);
+        %3.5
+        g2(i) = 2 * (((cos(q(i))^2) / (1 + exp(-3.5 * rho * q(i)))) - 0.5);
     end
-    g2 = awgn(g2, 50); 
+    g2 = awgn(g2, 30); 
+    
+    theta_fixed = 0.8; 
+    amp_fixed = 0.5;     
+
+    for i = 1:no_of_inputs
+        q(i) = (3/2) * input(i) - (3/10) * input(i)^2;
+        rho = (q(i) > 0) * 4 + (q(i) <= 0) * 0.5;
+
+        g3(i) = 2 * (((cos(q(i))^2) / (1 + exp(-3.5 * rho * q(i)))) - 0.5);
+
+        g3(i) = g3(i) + 0.5 * exp(-amp_fixed * abs(input(i))) .* ...
+                 sin(pi * input(i) * (1 + cos(theta_fixed)));
+    end
+
+    g3 = awgn(g3, 30);
 
     chi = 0.1;
     for i = 1:no_of_inputs
         if abs(input(i)) >= 0 && abs(input(i)) < chi
-            g3(i) = (2 / (3 * chi)) * input(i);
+            g1(i) = (2 / (3 * chi)) * input(i);
         elseif abs(input(i)) >= chi && abs(input(i)) < (2 * chi)
-            g3(i) = sign(input(i)) * (3 - (2 - abs(input(i)) / chi)^2) / 3;
+            g1(i) = sign(input(i)) * (3 - (2 - abs(input(i)) / chi)^2) / 3;
         else
-            g3(i) = sign(input(i));
+            g1(i) = sign(input(i));
         end
     end
-    g3 = awgn(g3, 50);
-
+    g1 = awgn(g1, 30);
+    
     for i = 1:length(input)
         x_buffer = [input(i) x_buffer(1:end-1)];
-         
         %--------------TFLN-----------------------------------------%
         TFLN_FEB = [1, x_buffer, sin(pi * x_buffer), cos(pi * x_buffer), sin(2 * pi * x_buffer), cos(2 * pi * x_buffer)];
         
@@ -78,17 +91,16 @@ for itr = 1:2
         
         %------------FRFT-FLN--------------------------------------%
         FRFT_FEB = [];
-        theta = alpha(i) * pi / 2;
-        amp = 6;
+        theta = alpha(i); 
         
         for k = 1:N
             for l = 1:FRFT_order
-                
                 fractional_mod_sin = sin(pi * l * x_buffer(k) * (1 + cos(theta)));
                 fractional_mod_cos = cos(pi * l * x_buffer(k) * (1 + cos(theta)));
                 
-                FRFT_FEB = [FRFT_FEB, exp(-amp*alpha(i) * abs(x_buffer(k))) * fractional_mod_sin, ...
-                            exp(-amp*alpha(i) * abs(x_buffer(k))) * fractional_mod_cos];
+                FRFT_FEB = [FRFT_FEB, ...
+                            exp(-amp(i) * abs(x_buffer(k))) * fractional_mod_sin, ...
+                            exp(-amp(i) * abs(x_buffer(k))) * fractional_mod_cos];
             end
         end
         
@@ -101,6 +113,8 @@ for itr = 1:2
             g(i) = g1(i);
         end
 
+        %Till now for G2 and G3(new one) it's working great comperatively
+%         g(i) = g3(i);
         %-----------------output & error calculation--------------------%
         FRFT_FEB_final = [1, x_buffer, FRFT_FEB];
         FRFT_output(i) = FRFT_weights * FRFT_FEB_final';
@@ -118,27 +132,41 @@ for itr = 1:2
             for l = 1:FRFT_order
                 fractional_mod_sin = sin(pi * l * x_buffer(k) * (1 + cos(theta)));
                 fractional_mod_cos = cos(pi * l * x_buffer(k) * (1 + cos(theta)));
-
-                d_fractional_mod_sin = (pi/2) * fractional_mod_cos * (pi*l*x_buffer(k) * sin(theta));
-                d_fractional_mod_cos = -(pi/2) * fractional_mod_sin * (pi*l*x_buffer(k) * sin(theta));
-
-
-                exp_term = exp(-amp*alpha(i) * abs(x_buffer(k)));
-                d_exp_term = -amp*abs(x_buffer(k)) * exp_term;
-
-                z_sin = d_exp_term * fractional_mod_sin ...
-                        + exp_term * d_fractional_mod_sin;
-
-                z_cos = d_exp_term * fractional_mod_cos ...
-                        + exp_term * d_fractional_mod_cos;
-
+                
+                e_exp_term = - abs(x_buffer(k)) * exp(-amp(i) * abs(x_buffer(k)));
+                
+                z_sin = e_exp_term * fractional_mod_sin;
+                z_cos = e_exp_term * fractional_mod_cos;
+                
                 z = [z, z_sin, z_cos];
             end
         end
         z_final = [0, zeros(1, N), z];
+        
+    %% Update Rule for Fractional Order (alpha/theta)
+        v = [];
+        for k = 1:N
+            for l = 1:FRFT_order
+                v_fractional_mod_sin = cos(pi * l * x_buffer(k) * (1 + cos(theta)));
+                v_fractional_mod_cos = sin(pi * l * x_buffer(k) * (1 + cos(theta)));
+                
+                v_d_fractional_mod_sin =  v_fractional_mod_cos * (pi * l * x_buffer(k) * sin(theta));
+                v_d_fractional_mod_cos = - v_fractional_mod_sin * (pi * l * x_buffer(k) * cos(theta));
+                
+                v_exp_term = exp(-amp(i) * abs(x_buffer(k)));
+                v_d_exp_term = - abs(x_buffer(k)) * v_exp_term;
+                
+                v_sin = v_exp_term * v_d_fractional_mod_sin ;
+                v_cos = v_exp_term * v_d_fractional_mod_cos ;
+                
+                v = [v, v_sin, v_cos];
+            end
+        end
+        v_final = [0, zeros(1, N), v];
          
 
-        alpha(i+1) = alpha(i) + mu_alpha* error_FTFTFLN(i) * z_final * FRFT_weights';
+        alpha(i+1) = alpha(i) + mu_theta * error_FTFTFLN(i) * v_final * FRFT_weights';     
+        amp(i + 1) = amp(i) + mu_a * error_FTFTFLN(i) * z_final * FRFT_weights';
         temp_vect=[zeros(1,N+1) ((-abs(x_buffer).*exp(-a(i)*abs(x_buffer))).*sin(pi*x_buffer))  ((-abs(x_buffer).*exp(-a(i)*abs(x_buffer))).*cos(pi*x_buffer)) ((-abs(x_buffer).*exp(-a(i)*abs(x_buffer))).*sin(2*pi*x_buffer))  ((-abs(x_buffer).*exp(-a(i)*abs(x_buffer))).*cos(2*pi*x_buffer))];
         a(i+1)=a(i)+0.1*error_AEFLN(i)*AEFLN_weights*temp_vect';
         
@@ -159,9 +187,9 @@ Error_FRFTFLN = mean(Err_FRFTFLN);
 
 N_smooth = 1000;
 %==============FsLMS===========================%
-Smooth_AEFLN = moving_average(Error_AEFLN, N_smooth);
-Smooth_TFLN = moving_average(Error_TFLN, N_smooth);
-Smooth_FRFTFLN = moving_average(Error_FRFTFLN, N_smooth);
+Smooth_AEFLN = smooth(Error_AEFLN, N_smooth,'moving');
+Smooth_TFLN = smooth(Error_TFLN, N_smooth,'moving');
+Smooth_FRFTFLN = smooth(Error_FRFTFLN, N_smooth,'moving');
 
 %----------Steady State MSE Values----------------%
 MSE_AEFLN = 10 * log10(mean(Smooth_AEFLN(end - 1000:end)));
@@ -169,17 +197,32 @@ MSE_TFLN = 10 * log10(mean(Smooth_TFLN(end - 1000:end)));
 MSE_FRFTFLN = 10 * log10(mean(Smooth_FRFTFLN(end - 1000:end)));
 
 figure;
-plot(10 * log10(Smooth_FRFTFLN), 'k');
-hold on;
 plot(10 * log10(Smooth_TFLN), 'b');
+hold on;
 plot(10 * log10(Smooth_AEFLN), 'r');
+plot(10 * log10(Smooth_FRFTFLN), 'k');
 xlabel('Iterations');
 ylabel('MSE (dB)');
-legend('FRFT-FLN', 'TFLN', 'AEFLN');
-title('MSE Comparison of AEFLN, TFLN, and FRFT-FLN Filters');
+legend( 'TFLN', 'AEFLN',  'FRFT-FLN');
+title('MSE Comparison of TFLN, AEFLN, and FRFT-FLN Filters');
 hold off;
 
 
-function smoothed_data = moving_average(data, window_size)
-    smoothed_data = filter(ones(1, window_size) / window_size, 1, data);
-end
+figure;
+plot(alpha, 'LineWidth', 1.2);
+title('Alpha');
+xlabel('alpha(i)');
+ylabel('Iterations');
+
+figure;
+plot(amp, 'LineWidth', 1.2);
+title('Amp');
+xlabel('amp(i)');
+ylabel('Iterations');
+
+figure;
+plot(a, 'LineWidth', 1.2);
+title('Exponantial');
+xlabel('a(i)');
+ylabel('Iterations');
+
