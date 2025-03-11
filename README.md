@@ -93,9 +93,5 @@ The repository includes result images demonstrating the performance of the algor
 ## Comparison Results:
   - FRFT-FLN outperforms AEFLN and TFLN in terms of MSE for most nonlinear systems.
 
----
-## Author
 
-- **[Kailash Dusad]**  
-- **[K Madhu]**  
 
