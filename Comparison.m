@@ -44,45 +44,51 @@ for itr = 1:10
     g1 = zeros(1, no_of_inputs);
     g2 = zeros(1, no_of_inputs);
     g3 = zeros(1, no_of_inputs);
-%     g4 = zeros(1,no_of_inputs);
+    g4 = zeros(1,no_of_inputs);
+
+    for i = 3:no_of_inputs
+        g1(i) = exp(0.5 * input(i)) * (sin(pi * input(i)) + 0.3 * sin(3 * pi * input(i - 2)) + 0.1 * sin(5 * pi * input(i)));
+    end
+    g1 = awgn(g1, 30);
+    
+    for i = 5:no_of_inputs
+        g4(i) = 0.8*sin(pi*input(i))^3 - (2.5/(2.5 + input(i-1)^2)) - 0.15*cos(3*pi*input(i-4)) + ...
+               0.1*sin(5*pi*input(i-2)) + 0.05*exp(-0.1*abs(input(i-3))) + 1.2;
+%           g4(i) = sin(pi*input(i))*(input(i)^2);
+    end
+    g4 = awgn(g4, 30);
+
 
     for i = 1:no_of_inputs
         q(i) = (3/2) * input(i) - (3/10) * input(i)^2;
         rho = (q(i) > 0) * 4 + (q(i) <= 0) * 0.5;
         %3.5
-        g2(i) = 2 * (((cos(q(i))^2) / (1 + exp(-3.5 * rho * q(i)))) - 0.5);
+        g2(i) = 2 * ((cos(q(i)) / (1 + exp(-3.5*rho * q(i)))) - 0.5);
     end
     g2 = awgn(g2, 30); 
-    
-    theta_fixed = 0.8; 
-    amp_fixed = 0.5;     
-
-    for i = 1:no_of_inputs
-        q(i) = (3/2) * input(i) - (3/10) * input(i)^2;
-        rho = (q(i) > 0) * 4 + (q(i) <= 0) * 0.5;
-
-        g3(i) = 2 * (((cos(q(i))^2) / (1 + exp(-3.5 * rho * q(i)))) - 0.5);
-
-        g3(i) = g3(i) + 0.5 * exp(-amp_fixed * abs(input(i))) .* ...
-                 sin(pi * input(i) * (1 + cos(theta_fixed)));
-    end
-
-    g3 = awgn(g3, 30);
 
     chi = 0.1;
     for i = 1:no_of_inputs
         if abs(input(i)) >= 0 && abs(input(i)) < chi
-            g1(i) = (2 / (3 * chi)) * input(i);
+            g3(i) = (2 / (3 * chi)) * input(i);
         elseif abs(input(i)) >= chi && abs(input(i)) < (2 * chi)
-            g1(i) = sign(input(i)) * (3 - (2 - abs(input(i)) / chi)^2) / 3;
+            g3(i) = sign(input(i)) * (3 - (2 - abs(input(i)) / chi)^2) / 3;
         else
-            g1(i) = sign(input(i));
+            g3(i) = sign(input(i));
         end
     end
-    g1 = awgn(g1, 30);
+    g3 = awgn(g3, 30);
+    noise = awgn(input, 30) - input; 
     
     for i = 1:length(input)
         x_buffer = [input(i) x_buffer(1:end-1)];
+        q = 1.5 * input(i) - 0.3 * input(i)^2; 
+        if q > 0
+            rho = 4; 
+        else
+            rho = 0.5; 
+        end
+        desired_output(i) = 2 * ((1 / (1 + exp(-rho * q))) - 0.5) + noise(i); 
         %--------------TFLN-----------------------------------------%
         TFLN_FEB = [1, x_buffer, sin(pi * x_buffer), cos(pi * x_buffer), sin(2 * pi * x_buffer), cos(2 * pi * x_buffer)];
         
@@ -105,16 +111,16 @@ for itr = 1:10
         end
         
         %--------------------System changing-----------------%
-        if i < no_of_inputs / 3
-            g(i) = g2(i);
-        elseif i >= no_of_inputs / 3 && i < 2 * no_of_inputs / 3
-            g(i) = g3(i);
-        else
-            g(i) = g1(i);
-        end
+%         if i < no_of_inputs / 3
+%             g(i) = g2(i);
+%         elseif i >= no_of_inputs / 3 && i < 2 * no_of_inputs / 3
+%             g(i) = g3(i);
+%         else
+%             g(i) = g1(i);
+%         end
 
-        %Till now for G2 and G3(new one) it's working great comperatively
-%         g(i) = g3(i);
+        %Till now for G2 it's working great comperatively
+        g(i) = g2(i);
         %-----------------output & error calculation--------------------%
         FRFT_FEB_final = [1, x_buffer, FRFT_FEB];
         FRFT_output(i) = FRFT_weights * FRFT_FEB_final';
@@ -209,19 +215,19 @@ hold off;
 
 
 figure;
-plot(alpha, 'LineWidth', 1.2);
+plot(alpha);
 title('Alpha');
 xlabel('alpha(i)');
 ylabel('Iterations');
 
 figure;
-plot(amp, 'LineWidth', 1.2);
+plot(amp);
 title('Amp');
 xlabel('amp(i)');
 ylabel('Iterations');
 
 figure;
-plot(a, 'LineWidth', 1.2);
+plot(a);
 title('Exponantial');
 xlabel('a(i)');
 ylabel('Iterations');
